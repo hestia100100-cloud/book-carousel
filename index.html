@@ -425,7 +425,7 @@ let last=performance.now(), frame=0;
 function tick(now){
   const dt=Math.min(50,now-last); last=now; frame++;
   if(mode==='shelf'){
-    x += (tx-x)*.12;
+    x += (tx-x)*.07;   // lower = slower, smoother turning
     layoutShelf();
     // once scrolling stops, settle the nearest book squarely at the focus point
     if(!down && now-lastInput>160){
