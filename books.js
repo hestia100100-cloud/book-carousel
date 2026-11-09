@@ -31,8 +31,11 @@ window.BOOKS = [
   {title:'哈利波特5 鳳凰會的密令',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:944},
   {title:'哈利波特6 混血王子的背叛',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:720},
   {title:'哈利波特7 死神的聖物',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:848},
-  {title:'1984',author:'George Orwell',publisher:'遠流',cat:'文學',pages:352},
-  {title:'晶片戰爭',author:'Chris Miller',publisher:'天下雜誌',cat:'商業',pages:468},
+  {title:'1984',author:'George Orwell',publisher:'野人文化（吳妍儀譯）',cat:'文學',pages:318,cover:'covers/1984-cover.jpg',spine:'covers/1984-spine.jpg',color:'#efece4'},
+  {title:'晶片戰爭',cover:'covers/chip-war-cover.jpg',spine:'covers/chip-war-spine.jpg',color:'#f2f2f0',author:'Chris Miller',publisher:'天下雜誌（暢銷增訂版）',cat:'商業',pages:468},
   {title:'納瓦爾寶典',author:'Eric Jorgenson',publisher:'天下雜誌',cat:'投資理財',pages:288},
   {title:'正向談判',cover:'covers/negotiation-cover.jpg',spine:'covers/negotiation-spine.jpg',color:'#eef3f0',author:'戚樹誠',publisher:'聯經',cat:'商業',pages:288},
+  // 東野圭吾（皇冠新譯版頁數查不到，暫用舊版頁數）
+  {title:'嫌疑犯X的獻身',author:'東野圭吾',publisher:'皇冠文化',cat:'推理',pages:349,cover:'covers/suspect-x-cover.jpg',spine:'covers/suspect-x-spine.jpg',color:'#1d1b1b'},
+  {title:'伽利略的苦惱',author:'東野圭吾',publisher:'皇冠文化（王蘊潔譯）',cat:'推理',pages:301,cover:'covers/galileo-cover.jpg',spine:'covers/galileo-spine.jpg',color:'#0d1416'},
 ];
