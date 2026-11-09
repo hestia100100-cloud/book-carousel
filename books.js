@@ -23,4 +23,12 @@ window.BOOKS = [
   {title:'S, M, L, XL',pages:1376,author:'Rem Koolhaas',status:'want',cat:'設計'},
   {title:'夜間飛行',pages:176,author:'Saint-Exupéry',status:'want',cat:'文學'},
   {title:'槍炮、病菌與鋼鐵',pages:482,author:'Jared Diamond',status:'reading',cat:'歷史'},
+  // 哈利波特 1–7（皇冠 20 週年紀念版；3、4、6、7 集頁數為依全套總頁數推估）
+  {title:'哈利波特1 神秘的魔法石',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:352},
+  {title:'哈利波特2 消失的密室',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:400},
+  {title:'哈利波特3 阿茲卡班的逃犯',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:456},
+  {title:'哈利波特4 火盃的考驗',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:808},
+  {title:'哈利波特5 鳳凰會的密令',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:944},
+  {title:'哈利波特6 混血王子的背叛',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:720},
+  {title:'哈利波特7 死神的聖物',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:848},
 ];

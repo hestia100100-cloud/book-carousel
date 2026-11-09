@@ -197,7 +197,8 @@ function bookEl(b, L, scale=S()){
   const el = document.createElement('div');
   el.className='book';
   el.style.cssText=`width:${w}px;height:${h}px;color:${L.fg}`;
-  const fs = Math.max(8, Math.min(w*.5, 16));
+  const room = Math.max(1,(h*.68)/16);   // characters that fit at full size
+  const fs = Math.max(8, Math.min(w*.5, 16, 16*room/Math.max(1,[...b.title].length)));
   el.innerHTML = `
     ${b.spine ? `<div class="face spine" style="background:${L.bg} ${url(b.spine)} center/100% 100%;transform:translateZ(${d/2}px)"></div>` :
     `<div class="face spine" style="background:${L.bg};transform:translateZ(${d/2}px)">
