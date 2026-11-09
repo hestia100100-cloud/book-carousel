@@ -32,6 +32,8 @@ body{background:var(--bg);color:var(--ink);font-family:'Inter Tight','Noto Sans 
 .preview{position:fixed;left:48px;top:20vh;width:170px;z-index:5;pointer-events:none}
 .preview .img{width:170px;aspect-ratio:3/2;border-radius:2px;overflow:hidden;position:relative;background:#eee;transition:background .3s}
 .preview .img .cover{position:absolute;inset:0;padding:10px}
+.preview .img.real{background:transparent!important;overflow:visible}
+.preview .img.real img{height:100%;width:auto;display:block;border-radius:1px;box-shadow:0 6px 14px -6px rgba(0,0,0,.35)}
 .preview .cap{font-size:12px;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .preview .cap small{color:var(--muted);margin-left:6px}
 
@@ -103,6 +105,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Inter Tight','Noto Sans 
   .mast,.rule,.meta{left:16px;right:16px}
   .mast{top:16px}.mast .brand span{display:none}
   .preview{left:16px;top:70px;width:110px}.preview .img{width:110px}
+  .preview .img.real{height:140px;aspect-ratio:auto;width:auto}
   .big{left:14px;bottom:13vh}.foot{right:16px;bottom:13vh}.side{display:none}
   #detail{top:auto;width:100%;max-height:58vh;padding:60px 20px 28px;transform:translateY(105%);border-left:0;border-top:1px solid var(--line)}
 }
@@ -214,8 +217,13 @@ let pvCur=-1;
 function preview(b){
   if(!b || pvCur===b._i) return; pvCur=b._i;
   const L=look(b);
-  pvImg.style.background=L.bg; pvImg.style.color=L.fg;
-  pvImg.innerHTML=`<div class="cover">${coverInner(b,L,15,'contain')}</div>`;
+  pvImg.classList.toggle('real',!!b.cover);
+  if(b.cover){ // real book: just the cover itself, no backdrop
+    pvImg.innerHTML=`<img src="${esc(b.cover)}" alt="">`;
+  } else {
+    pvImg.style.background=L.bg; pvImg.style.color=L.fg;
+    pvImg.innerHTML=`<div class="cover">${coverInner(b,L,15)}</div>`;
+  }
   pvCap.innerHTML=`${esc(b.title)}<small>${esc(b.author||'')}</small>`;
 }
 const STATUS = {done:'已完成',reading:'閱讀中',want:'想讀',paused:'暫停'};
