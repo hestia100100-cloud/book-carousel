@@ -107,7 +107,11 @@ body{background:var(--bg);color:var(--ink);font-family:'Inter Tight','Noto Sans 
   .preview{left:16px;top:70px;width:110px}.preview .img{width:110px}
   .preview .img.real{height:140px;aspect-ratio:auto;width:auto}
   .big{left:14px;bottom:13vh}.foot{right:16px;bottom:13vh}.side{display:none}
-  #detail{top:auto;width:100%;max-height:58vh;padding:60px 20px 28px;transform:translateY(105%);border-left:0;border-top:1px solid var(--line)}
+  #shelf .track{transition:bottom .6s cubic-bezier(.6,0,.2,1)}
+  body.reading #shelf .track{bottom:calc(52vh + 16px)}
+  body.reading .preview, body.reading .big, body.reading .foot{opacity:0}
+  .preview,.big,.foot{transition:opacity .4s}
+  #detail{top:auto;width:100%;max-height:52vh;padding:60px 20px 28px;transform:translateY(105%);border-left:0;border-top:1px solid var(--line)}
 }
 </style>
 </head>
@@ -239,10 +243,10 @@ function showDetail(b){
     ${quotes.length?`<div class="lbl">Quote · 名言摘錄</div>${quotes.map(q=>`<blockquote>${esc(q)}</blockquote>`).join('')}`:''}
     ${b.note?`<div class="lbl">Notes · 我的心得</div><p>${esc(b.note)}</p>`:''}
     ${meta.length?`<div class="lbl">Info</div><dl class="metarow">${meta.map(m=>`<dt>${m[0]}</dt><dd>${esc(m[1])}</dd>`).join('')}</dl>`:''}`;
-  detail.classList.add('open');
+  detail.classList.add('open'); document.body.classList.add('reading');
   preview(b);
 }
-function hideDetail(){ detail.classList.remove('open'); }
+function hideDetail(){ detail.classList.remove('open'); document.body.classList.remove('reading'); }
 detail.querySelector('.x').onclick=()=>{ hideDetail(); deselect(); };
 document.getElementById('count').textContent = `${books.length} Books`;
 document.getElementById('date').textContent = new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'});
@@ -272,7 +276,12 @@ const focusX = () => (detail.classList.contains('open') && innerWidth>700) ? (in
 function nearestSlot(){
   let best=null; for(const s of slots) if(!best||Math.abs(s.dist)<Math.abs(best.dist)) best=s; return best;
 }
-function centreOn(s){ tx -= s.dist; lastInput=0; }
+// where a book will sit relative to the focus once the shelf finishes moving
+const targetDist = s => s.s0 + tx - focusX();
+function nearestTarget(){
+  let best=null, bd=1e9; for(const s of slots){ const d=Math.abs(targetDist(s)); if(d<bd){bd=d;best=s;} } return best;
+}
+function centreOn(s){ tx -= targetDist(s); lastInput=0; }
 function deselect(){}
 function layoutShelf(){
   const sc=S(), R=46*sc, F=focusX();
@@ -370,7 +379,7 @@ stage.addEventListener('pointerup',e=>{
   if(!wasClick) return;
   const hit=bookAt(e.clientX,e.clientY);
   if(!hit){ hideDetail(); return; }
-  if(mode==='shelf'){ const s=slots.find(s=>s.el===hit); if(s){ centreOn(s); showDetail(s.b); } }
+  if(mode==='shelf'){ const s=slots.find(s=>s.el===hit); if(s){ showDetail(s.b); focusIdx=s.b._i; centreOn(s); } }
   else { const it=ringItems.find(r=>r.el===hit); if(it){ liftRing(it); showDetail(it.b); } }
 });
 addEventListener('wheel',e=>{
@@ -407,8 +416,10 @@ function tick(now){
     layoutShelf();
     // once scrolling stops, settle the nearest book squarely at the focus point
     if(!down && now-lastInput>160){
+      // settle toward where the shelf is heading, not where it is now (so it never fights a click)
+      const t=nearestTarget(), td=targetDist(t);
+      if(Math.abs(td)>.5) tx -= td*.25;
       const n=nearestSlot();
-      if(Math.abs(n.dist)>.5) tx -= n.dist*.25;
       if(n.b._i!==focusIdx && Math.abs(n.dist)<20){
         focusIdx=n.b._i;
         if(!hoverSlot) preview(n.b);
