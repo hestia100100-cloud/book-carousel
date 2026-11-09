@@ -261,16 +261,20 @@ let slots=[], setWidth=0, x=0, tx=0, lastInput=0, focusIdx=-1, hoverSlot=null;
 function buildShelf(){
   track.innerHTML=''; slots=[];
   const s=S(), gap=4*s, items = books.map(b=>({b,L:look(b)}));
-  setWidth = items.reduce((t,it)=>t+it.L.w*s+gap,0);
+  // a leaning book needs room on the side its top tips toward, so it never cuts into its neighbour
+  const room = L => L.lean ? L.h*s*Math.sin(Math.abs(L.lean)*Math.PI/180) + 2*s : 0;
+  setWidth = items.reduce((t,it)=>t+it.L.w*s+gap+room(it.L),0);
   const copies = Math.max(3, Math.ceil(innerWidth/setWidth)+3);
   let pos=0;
   for(let c=0;c<copies;c++) items.forEach(({b,L})=>{
-    const {el,w,d} = bookEl(b,L);
+    const {el,w,d,h} = bookEl(b,L);
     const slot=document.createElement('div');
     slot.className='slot'; slot.style.width=w+'px';
     slot.appendChild(el); track.appendChild(slot);
-    slots.push({slot,el,b,w,d,lean:L.lean,s0:pos+w/2,lift:0,e:0,dist:0});
-    pos+=w+gap;
+    const r=room(L);
+    // leaning left (lean<0) tips toward the left, so its room goes before it
+    slots.push({slot,el,b,w,d,h,lean:L.lean,s0:pos+(L.lean<0?r:0)+w/2,lift:0,e:0,dist:0});
+    pos+=w+gap+r;
   });
 }
 const focusX = () => (detail.classList.contains('open') && innerWidth>700) ? (innerWidth-400)/2 : innerWidth/2;
@@ -284,17 +288,23 @@ function nearestTarget(){
 }
 function centreOn(s){ tx -= targetDist(s); lastInput=0; }
 function deselect(){}
+const ZOOM=.28;
 function layoutShelf(){
   const sc=S(), R=46*sc, F=focusX();
   // keep the virtual strip covering the screen (infinite loop)
   while(tx>-setWidth){ tx-=setWidth; x-=setWidth; }
   while(tx<-setWidth*2){ tx+=setWidth; x+=setWidth; }
   let E=0;
-  for(const s of slots){
-    s.dist = s.s0 + x - F;
-    const g = Math.abs(s.dist)<R ? .5+.5*Math.cos(Math.PI*s.dist/R) : 0, f = g*g*(3-2*g)*g;  // eased: only the centre book opens fully
+  for(const s of slots) s.dist = s.s0 + x - F;
+  for(let i=0;i<slots.length;i++){
+    const s=slots[i];
+    // a book turns while it is closer to the focus than its neighbour on the focus side,
+    // so at rest only the centre book is open, whatever the spine widths
+    const nb = slots[i + (s.dist>0?-1:1)], Ri = nb ? Math.min(R*1.6, Math.abs(s.s0-nb.s0)) : R;
+    const g = Math.abs(s.dist)<Ri ? .5+.5*Math.cos(Math.PI*s.dist/Ri) : 0, f = g*g*(3-2*g)*g;
     s.f=f; s.a=f*Math.PI/2;
-    s.e = (s.w*Math.cos(s.a)+s.d*Math.sin(s.a)) - s.w + 26*sc*f;   // extra width while turned
+    s.k = 1 + ZOOM*f;                                   // the centre book grows a little
+    s.e = (s.w*Math.cos(s.a)+s.d*Math.sin(s.a))*s.k - s.w + 30*sc*f;   // extra width while turned
     E+=s.e;
   }
   let P=0;
@@ -303,8 +313,10 @@ function layoutShelf(){
     P+=s.e;
     s.lift += ((s===hoverSlot && s.f<.5 ? 1:0) - s.lift)*.2;
     const cx = s.s0 + x + off;
-    s.slot.style.transform=`translate3d(${cx-s.w/2}px,${-14*sc*s.lift - 8*sc*s.f}px,0)`;
-    s.el.style.transform=`rotateZ(${s.lean*(1-s.f)}deg) rotateY(${s.a*180/Math.PI}deg)`;
+    s.slot.style.transform=`translate3d(${cx-s.w/2}px,${-14*sc*s.lift}px,0)`;
+    // lean pivots on the bottom corner it rests on (right corner when tipping right, left when tipping left)
+    const lean=s.lean*(1-s.f), px=(s.lean>0?1:-1)*s.w/2;
+    s.el.style.transform=`scale3d(${s.k},${s.k},${s.k}) translateX(${px}px) rotateZ(${lean}deg) translateX(${-px}px) rotateY(${s.a*180/Math.PI}deg)`;
     const flat = s.f<.002; if(flat!==s.flat){ s.flat=flat; s.slot.classList.toggle('flat',flat); }
   }
   track.style.perspectiveOrigin=`${F}px -140px`;
