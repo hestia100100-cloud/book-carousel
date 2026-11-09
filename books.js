@@ -31,4 +31,8 @@ window.BOOKS = [
   {title:'哈利波特5 鳳凰會的密令',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:944},
   {title:'哈利波特6 混血王子的背叛',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:720},
   {title:'哈利波特7 死神的聖物',author:'J.K. 羅琳',publisher:'皇冠文化',cat:'奇幻',pages:848},
+  {title:'1984',author:'George Orwell',publisher:'遠流',cat:'文學',pages:352},
+  {title:'晶片戰爭',author:'Chris Miller',publisher:'天下雜誌',cat:'商業',pages:468},
+  {title:'納瓦爾寶典',author:'Eric Jorgenson',publisher:'天下雜誌',cat:'投資理財',pages:288},
+  {title:'正向談判',author:'戚樹誠',publisher:'聯經',cat:'商業',pages:288},
 ];
