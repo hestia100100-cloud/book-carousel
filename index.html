@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的書櫃</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=DM+Sans:wght@400;500;700&family=Noto+Serif+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F3F1EC; --ink:#1a1a18; --muted:#6b6b67; --line:rgba(0,0,0,.12);
+  --panel:#fff; --shadow:0 30px 60px -20px rgba(0,0,0,.35);
+  --s:1; /* global book scale */
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#17171a;--ink:#f1efe8;--muted:#9f9f99;--line:rgba(255,255,255,.14);--panel:#222226}
+}
+:root[data-theme="dark"]{--bg:#17171a;--ink:#f1efe8;--muted:#9f9f99;--line:rgba(255,255,255,.14);--panel:#222226}
+@media (max-width:700px){:root{--s:.72}}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:'DM Sans','Noto Serif TC',sans-serif;overflow:hidden;
+  -webkit-user-select:none;user-select:none;touch-action:none}
+
+/* ── top bar ── */
+header{position:fixed;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:center;
+  padding:18px 24px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;z-index:20}
+header a{color:var(--muted);text-decoration:none}
+header a:hover{color:var(--ink)}
+.modes{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:4px}
+.modes button{border:0;background:none;color:var(--muted);font:inherit;letter-spacing:.1em;padding:7px 14px;border-radius:99px;cursor:pointer}
+.modes button.on{background:var(--ink);color:var(--bg)}
+
+h1{position:fixed;left:0;right:0;top:9vh;text-align:center;font-family:'Playfair Display','Noto Serif TC',serif;
+  font-weight:500;font-size:clamp(34px,6vw,64px);line-height:1.02;letter-spacing:.01em;text-transform:uppercase;
+  pointer-events:none;z-index:1;transition:opacity .5s}
+h1 small{display:block;font-family:'DM Sans';font-size:11px;letter-spacing:.3em;color:var(--muted);margin-bottom:14px}
+.hint{position:fixed;bottom:22px;left:0;right:0;text-align:center;font-size:11px;letter-spacing:.25em;color:var(--muted);
+  text-transform:uppercase;pointer-events:none;z-index:2}
+
+/* ── stage ── */
+#stage{position:fixed;inset:0;cursor:grab}
+#stage.dragging{cursor:grabbing}
+.view{position:absolute;inset:0;transition:opacity .6s, visibility .6s}
+.view.off{opacity:0;visibility:hidden}
+
+/* ── book (3D box) ── */
+.book{position:relative;transform-style:preserve-3d;cursor:pointer}
+.face{position:absolute;inset:0;backface-visibility:hidden;overflow:hidden}
+.spine{display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:10px 0 12px;
+  box-shadow:inset 3px 0 6px -3px rgba(0,0,0,.35), inset -3px 0 6px -3px rgba(255,255,255,.25)}
+.spine .t{writing-mode:vertical-rl;font-family:'Noto Serif TC','Playfair Display',serif;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;line-height:1}
+.spine .a{writing-mode:vertical-rl;font-size:9px;letter-spacing:.08em;opacity:.75;white-space:nowrap;max-height:35%;overflow:hidden}
+.spine .mark{width:55%;height:2px;background:currentColor;opacity:.5;margin-bottom:8px}
+.cover{display:flex;flex-direction:column;justify-content:space-between;padding:14px;
+  box-shadow:inset 6px 0 10px -6px rgba(0,0,0,.4)}
+.cover .ct{font-family:'Noto Serif TC','Playfair Display',serif;font-weight:900;font-size:20px;line-height:1.15}
+.cover .ca{font-size:11px;letter-spacing:.1em;opacity:.8}
+.cover .art{flex:1;margin:12px 0;border-radius:2px;position:relative}
+.top{position:absolute;left:0;top:0;background:#efe9dc;
+  background-image:repeating-linear-gradient(90deg,rgba(0,0,0,.06) 0 1px,transparent 1px 3px)}
+
+/* ── shelf view ── */
+#shelf .track{position:absolute;left:0;bottom:calc(50% - 150px*var(--s));display:flex;align-items:flex-end;
+  will-change:transform;perspective:1400px}
+#shelf .slot{flex:none;display:flex;justify-content:center;align-items:flex-end;padding:0 calc(3px*var(--s));
+  transition:width .7s cubic-bezier(.6,0,.2,1)}
+#shelf .slot{transition:width .7s cubic-bezier(.6,0,.2,1), transform .3s}
+#shelf .slot.sel .book, #shelf .slot.leaving .book{transition:transform .7s cubic-bezier(.6,0,.2,1)}
+#shelf .slot:not(.sel):hover{transform:translateY(-14px)}
+#shelf .floor{position:absolute;left:0;right:0;bottom:calc(50% - 150px*var(--s) - 1px);height:1px;background:var(--line)}
+#shelf .floor::after{content:"";position:absolute;left:0;right:0;top:1px;height:60px;
+  background:linear-gradient(var(--line),transparent);opacity:.35}
+
+/* ── ring view ── */
+#ring{perspective:3000px;perspective-origin:50% 10%}
+#ring .carousel{position:absolute;left:50%;top:57%;transform-style:preserve-3d;will-change:transform}
+#ring .book{position:absolute;left:0;top:0}
+
+/* ── detail panel ── */
+#detail{position:fixed;right:0;top:0;bottom:0;width:min(380px,92vw);background:var(--panel);z-index:30;
+  padding:72px 28px 32px;overflow:auto;transform:translateX(105%);transition:transform .6s cubic-bezier(.6,0,.2,1);
+  box-shadow:var(--shadow);-webkit-user-select:text;user-select:text;touch-action:auto}
+#detail.open{transform:none}
+#detail .x{position:absolute;right:18px;top:18px;border:1px solid var(--line);background:none;color:var(--ink);
+  width:34px;height:34px;border-radius:50%;font-size:16px;cursor:pointer}
+#detail h2{font-family:'Noto Serif TC','Playfair Display',serif;font-size:26px;line-height:1.25;margin-bottom:6px}
+#detail .by{color:var(--muted);font-size:13px;margin-bottom:14px}
+#detail .tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
+#detail .tag{font-size:11px;border:1px solid var(--line);border-radius:99px;padding:4px 10px}
+#detail .stars{color:#E0A030;letter-spacing:2px}
+#detail .lbl{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+#detail p{font-size:14px;line-height:1.75}
+#detail blockquote{font-family:'Noto Serif TC',serif;font-size:15px;line-height:1.7;border-left:2px solid var(--ink);padding-left:12px;margin-bottom:10px}
+#detail .meta{font-size:13px;color:var(--muted);line-height:1.9}
+@media (max-width:700px){
+  #detail{top:auto;width:100%;max-height:52vh;padding:56px 20px 28px;transform:translateY(105%);border-radius:18px 18px 0 0}
+  header{padding:14px 16px}
+  .modes button{padding:6px 10px}
+}
+</style>
+</head>
+<body>
+<header>
+  <span style="color:var(--muted)">My Bookshelf</span>
+  <div class="modes">
+    <button data-mode="shelf" class="on">書架</button>
+    <button data-mode="ring">書環</button>
+  </div>
+</header>
+
+<h1><small id="count"></small>The Personal<br>Curation</h1>
+
+<div id="stage">
+  <div class="view" id="shelf"><div class="floor"></div><div class="track"></div></div>
+  <div class="view off" id="ring"><div class="carousel"></div></div>
+</div>
+<div class="hint" id="hint">拖曳或滾動 · 點一本書抽出來看</div>
+
+<aside id="detail" aria-live="polite"><button class="x" aria-label="關閉">✕</button><div id="dbody"></div></aside>
+
+<script src="books.js"></script>
+<script>
+/* ───────────── data ───────────── */
+/* 在 books.js 裡編輯你的書單 */
+const books0 = (window.BOOKS && window.BOOKS.length) ? window.BOOKS : [{title:'範例書',author:'作者'}];
+const usingSample = false;
+let books = books0;
+books = books.map((b,i)=>({...b,_i:i}));
+
+/* deterministic per-book randomness */
+function hash(s){let h=2166136261;for(const c of s){h^=c.codePointAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function rnd(seed,n){return ((hash(seed+'#'+n)%10000)/10000)}
+
+const PALETTE = [
+  ['#F2A7C3','#7a1f45'],['#E85D8E','#fff'],['#4C8C4A','#fff'],['#E4392F','#fff'],['#1F5FA8','#fff'],
+  ['#E8E6E0','#1a1a18'],['#2A2A2E','#f1efe8'],['#F0A21E','#1a1a18'],['#E8642A','#fff'],['#5A1E22','#f3e3c9'],
+  ['#2C3E70','#fff'],['#B8D8E8','#123'],['#7C7AD8','#fff'],['#C9B99A','#2a2418'],['#24564A','#f1efe8'],['#F7E25C','#1a1a18']
+];
+function look(b){
+  const key = (b.id||'')+b.title;
+  const [bg,fg] = PALETTE[hash(key)%PALETTE.length];
+  const h = Math.round(190 + rnd(key,1)*80);           // height
+  const w = Math.round(24 + rnd(key,2)*26);            // spine thickness
+  const d = Math.round(h*(0.66+rnd(key,3)*0.12));      // cover width (depth)
+  const art = hash(key+'art')%4;
+  const lean = rnd(key,4)<.18 ? (rnd(key,5)<.5?-1:1)*(4+rnd(key,6)*6) : 0;
+  return {bg,fg,h,w,d,art,lean};
+}
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function artHTML(L){
+  const c = L.fg;
+  switch(L.art){
+    case 0: return `<div class="art" style="background:radial-gradient(circle at 50% 55%, ${c} 0 22%, transparent 23%)"></div>`;
+    case 1: return `<div class="art" style="background:repeating-linear-gradient(0deg, ${c} 0 2px, transparent 2px 10px);opacity:.55"></div>`;
+    case 2: return `<div class="art" style="border:2px solid ${c};background:linear-gradient(135deg,transparent 49%,${c} 49% 51%,transparent 51%)"></div>`;
+    default:return `<div class="art" style="background:linear-gradient(${c},${c}) 0 100%/100% 38% no-repeat;opacity:.8"></div>`;
+  }
+}
+
+/* build one 3D book. Spine faces +Z; front cover is the left side (-X). */
+function bookEl(b, L){
+  const s = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1;
+  const h=L.h*s, w=L.w*s, d=L.d*s;
+  const el = document.createElement('div');
+  el.className='book';
+  el.style.cssText=`width:${w}px;height:${h}px;color:${L.fg}`;
+  const fs = Math.max(10, Math.min(w*.52, 17));
+  el.innerHTML = `
+    <div class="face spine" style="background:${L.bg};transform:translateZ(${d/2}px)">
+      <div class="mark"></div>
+      <div class="t" style="font-size:${fs}px">${esc(b.title)}</div>
+      <div class="a">${esc(b.author||'')}</div>
+    </div>
+    <div class="face spine" style="background:${L.bg};filter:brightness(.8);transform:rotateY(180deg) translateZ(${d/2}px)"></div>
+    <div class="face cover" style="background:${L.bg};width:${d}px;left:${(w-d)/2}px;transform:rotateY(-90deg) translateZ(${w/2}px)">
+      <div class="ca">${esc(b.author||'')}</div>${artHTML(L)}<div class="ct" style="font-size:${Math.min(22,d/7)}px">${esc(b.title)}</div>
+    </div>
+    <div class="face" style="background:${L.bg};filter:brightness(.7);width:${d}px;left:${(w-d)/2}px;transform:rotateY(90deg) translateZ(${w/2}px)"></div>
+    <div class="top" style="width:${w}px;height:${d}px;top:${-d/2}px;transform:rotateX(90deg)"></div>`;
+  el.dataset.i=b._i;
+  return {el,w,h,d};
+}
+
+/* ───────────── detail panel ───────────── */
+const STATUS = {done:'已完成',reading:'閱讀中',want:'想讀',paused:'暫停'};
+const detail = document.getElementById('detail');
+function showDetail(b){
+  const quotes=(b.quote||'').split('\n').map(q=>q.trim()).filter(Boolean);
+  const meta=[b.publisher&&`出版：${esc(b.publisher)}`,b.lang&&`語言：${esc(b.lang)}`,b.start&&`開始：${esc(b.start)}`,
+    b.end&&`完讀：${esc(b.end)}`,b.recommender&&`推薦：${esc(b.recommender)}`].filter(Boolean);
+  document.getElementById('dbody').innerHTML=`
+    <h2>${esc(b.title)}</h2><div class="by">${esc(b.author||'')}</div>
+    <div class="tags">${b.status?`<span class="tag">${STATUS[b.status]||esc(b.status)}</span>`:''}
+      ${b.cat?`<span class="tag">${esc(b.cat)}</span>`:''}
+      ${b.stars?`<span class="tag stars">${'★'.repeat(b.stars)}</span>`:''}</div>
+    ${meta.length?`<div class="meta">${meta.join('<br>')}</div>`:''}
+    ${b.note?`<div class="lbl">我的心得</div><p>${esc(b.note)}</p>`:''}
+    ${quotes.length?`<div class="lbl">名言摘錄</div>${quotes.map(q=>`<blockquote>${esc(q)}</blockquote>`).join('')}`:''}
+    ${usingSample?`<div class="lbl">提示</div><p style="color:var(--muted)">目前顯示的是範例書。到「管理書單」新增你的書，這裡就會自動換成你的書櫃。</p>`:''}`;
+  detail.classList.add('open');
+}
+function hideDetail(){ detail.classList.remove('open'); }
+detail.querySelector('.x').onclick=()=>{ hideDetail(); deselect(); };
+document.getElementById('count').textContent = `${books.length} 本書`;
+
+/* ───────────── shelf view ───────────── */
+const track = document.querySelector('#shelf .track');
+let slots=[], setWidth=0, copies=1;
+function buildShelf(){
+  track.innerHTML=''; slots=[];
+  const items = books.map(b=>({b,L:look(b)}));
+  const one = items.reduce((s,it)=>s+it.L.w*(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1)+6,0);
+  copies = Math.max(3, Math.ceil(innerWidth*2/one)+2);
+  for(let c=0;c<copies;c++) items.forEach(({b,L})=>{
+    const {el,w,d} = bookEl(b,L);
+    const slot=document.createElement('div');
+    slot.className='slot';
+    const base = w+6*(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--s'))||1);
+    slot.style.width=base+'px';
+    el.style.transform=`rotateZ(${L.lean}deg)`;
+    el.style.transformOrigin = L.lean<0?'0% 100%':'100% 100%';
+    slot.appendChild(el); track.appendChild(slot);
+    slots.push({slot,el,b,base,open:d+28,lean:L.lean});
+  });
+  setWidth = one;
+}
+let x=0, tx=0, vel=0, selected=null;
+function deselect(){
+  if(!selected) return;
+  const s=selected; selected=null;
+  s.slot.classList.remove('sel'); s.slot.classList.add('leaving'); s.slot.style.width=s.base+'px';
+  setTimeout(()=>s.slot.classList.remove('leaving'),750);
+  s.el.style.transform=`rotateZ(${s.lean}deg)`;
+}
+function selectSlot(s){
+  if(selected===s){ deselect(); hideDetail(); return; }
+  deselect(); selected=s;
+  s.slot.classList.add('sel'); s.slot.style.width=s.open+'px';
+  s.el.style.transform=`translateY(-10px) rotateY(90deg)`;
+  // bring it toward the centre (account for detail panel on wide screens)
+  const r=s.slot.getBoundingClientRect();
+  const centre = innerWidth>700 ? (innerWidth-380)/2 : innerWidth/2;
+  tx += centre-(r.left+s.open/2);
+  showDetail(s.b);
+}
+
+/* ───────────── ring view ───────────── */
+const carousel=document.querySelector('#ring .carousel');
+let ringItems=[], ringR=0, rot=0, trot=0;
+function buildRing(){
+  carousel.innerHTML=''; ringItems=[];
+  const n = Math.max(64, books.length);
+  ringR = Math.min(innerWidth*0.34, 440);
+  const sc = Math.min(1, ringR/440)*0.55;
+  for(let i=0;i<n;i++){
+    const b=books[i%books.length]; const L0=look(b);
+    const L={...L0,h:L0.h*sc,w:L0.w*sc,d:L0.d*sc};
+    const {el,w,h}=bookEl(b,L);
+    const a = i/n*360;
+    el.style.transform=`translate(${-w/2}px,${-h}px) rotateY(${a}deg) translateZ(${ringR}px)`;
+    carousel.appendChild(el); ringItems.push({el,b});
+  }
+}
+/* ───────────── interaction ───────────── */
+let mode='shelf';
+const stage=document.getElementById('stage');
+let down=null, moved=0;
+stage.addEventListener('pointerdown',e=>{
+  down={x:e.clientX,y:e.clientY,t:performance.now()}; moved=0;
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove',e=>{
+  if(!down) return;
+  const dx=e.clientX-down.x; down.x=e.clientX; moved+=Math.abs(dx);
+  if(moved>6){ stage.classList.add('dragging'); if(mode==='shelf'&&selected){deselect();hideDetail();} }
+  if(mode==='shelf') tx+=dx*1.2; else trot+=dx*.25;
+});
+stage.addEventListener('pointerup',e=>{
+  stage.classList.remove('dragging');
+  const wasClick = moved<6; down=null;
+  if(!wasClick) return;
+  stage.releasePointerCapture(e.pointerId);
+  const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest('.book');
+  if(!hit){ deselect(); hideDetail(); return; }
+  if(mode==='shelf'){ const s=slots.find(s=>s.el===hit); if(s) selectSlot(s); }
+  else { const it=ringItems.find(r=>r.el===hit); if(it) showDetail(it.b); }
+});
+addEventListener('wheel',e=>{
+  if(detail.contains(e.target)) return;
+  const d = Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
+  if(mode==='shelf'){ if(selected&&Math.abs(d)>4){deselect();hideDetail();} tx-=d; }
+  else trot-=d*.08;
+},{passive:true});
+addEventListener('keydown',e=>{
+  if(e.key==='Escape'){deselect();hideDetail();}
+  if(e.key==='ArrowRight'){ mode==='shelf'?tx-=160:trot-=10; }
+  if(e.key==='ArrowLeft'){ mode==='shelf'?tx+=160:trot+=10; }
+});
+
+document.querySelectorAll('.modes button').forEach(btn=>btn.onclick=()=>{
+  mode=btn.dataset.mode;
+  document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('on',b===btn));
+  document.getElementById('shelf').classList.toggle('off',mode!=='shelf');
+  document.getElementById('ring').classList.toggle('off',mode!=='ring');
+  document.querySelector('h1').style.opacity = mode==='ring'?.25:1;
+  document.getElementById('hint').textContent = mode==='shelf'?'拖曳或滾動 · 點一本書抽出來看':'拖曳或滾動旋轉 · 點書看詳情';
+  deselect(); hideDetail();
+});
+
+/* ───────────── loop ───────────── */
+let last=performance.now(), auto=true;
+function tick(now){
+  const dt=Math.min(50,now-last); last=now;
+  if(mode==='shelf'){
+    // infinite wrap (only while nothing is pulled out)
+    if(!selected){
+      while(tx>-setWidth){ tx-=setWidth; x-=setWidth; }
+      while(tx<-setWidth*2){ tx+=setWidth; x+=setWidth; }
+    }
+    const nx = x+(tx-x)*.1; vel = nx-x; x=nx;
+    track.style.transform=`translate3d(${x}px,0,0)`;
+    // books sway with scroll speed
+    const sway=Math.max(-14,Math.min(14,vel*.6));
+    track.style.perspectiveOrigin=`${-x+innerWidth/2}px 40%`;
+    for(const s of slots) if(s!==selected && !s.slot.classList.contains('leaving')) s.el.style.transform=`rotateZ(${s.lean}deg) rotateY(${-sway}deg)`;
+  } else {
+    if(!down && !detail.classList.contains('open')) trot -= dt*.006; // gentle auto-spin
+    rot += (trot-rot)*.08;
+    carousel.style.transform=`rotateX(-24deg) rotateY(${rot}deg)`;
+  }
+  requestAnimationFrame(tick);
+}
+function build(){ buildShelf(); buildRing(); tx=x=-setWidth; }
+build();
+let rz; addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{deselect();hideDetail();build();},200)});
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
