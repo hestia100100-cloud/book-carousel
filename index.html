@@ -30,7 +30,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Inter Tight','Noto Sans 
 .pills button:hover{background:#e2e2e2}
 
 .preview{position:fixed;left:48px;top:20vh;width:170px;z-index:5;pointer-events:none}
-.preview .img{width:170px;height:114px;border-radius:2px;overflow:hidden;position:relative;background:#eee;transition:background .3s}
+.preview .img{width:170px;aspect-ratio:3/2;border-radius:2px;overflow:hidden;position:relative;background:#eee;transition:background .3s}
 .preview .img .cover{position:absolute;inset:0;padding:10px}
 .preview .cap{font-size:12px;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .preview .cap small{color:var(--muted);margin-left:6px}
@@ -104,7 +104,7 @@ body{background:var(--bg);color:var(--ink);font-family:'Inter Tight','Noto Sans 
 @media (max-width:700px){
   .mast,.rule,.meta{left:16px;right:16px}
   .mast{top:16px}.mast .brand span{display:none}
-  .preview{left:16px;top:70px;width:110px}.preview .img{width:110px;height:74px}
+  .preview{left:16px;top:70px;width:110px}.preview .img{width:110px}
   .big{left:14px;bottom:13vh}.foot{right:16px;bottom:13vh}.side{display:none}
   #detail{top:auto;width:100%;max-height:58vh;padding:60px 20px 28px;transform:translateY(105%);border-left:0;border-top:1px solid var(--line)}
 }
@@ -158,6 +158,10 @@ function look(b){
   const d = Math.round(h*(0.68+rnd(key,3)*0.1));
   const art = hash(key+'art')%5;
   const lean = rnd(key,4)<.15 ? (rnd(key,5)<.5?-1:1)*(4+rnd(key,6)*5) : 0;
+  if(b.cover){ // real book: keep its true proportions (spine & cover images)
+    const H=255, ar=b.coverRatio||0.75, sr=b.spineRatio||0.07;
+    return {bg:b.color||'#1d2b44',fg:'#fff',ac:'#fff',h:H,w:Math.round(H*sr),d:Math.round(H*ar),art,lean:0,key,img:true};
+  }
   return {bg,fg,ac,h,w,d,art,lean,key};
 }
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -173,7 +177,9 @@ function artCSS(L){
     default:return `conic-gradient(from ${r(13)*3.6}deg at 60% 55%, ${a}, transparent 25%, ${a}88 50%, transparent 75%)`;
   }
 }
-function coverInner(b,L,size){
+const url = u => `url('${encodeURI(String(u)).replace(/'/g,'%27')}')`;
+function coverInner(b,L,size,fit='cover'){
+  if(b.cover) return `<div class="art" style="background:${url(b.cover)} center/${fit} no-repeat"></div>`;
   return `<div class="art" style="background:${artCSS(L)}"></div>
     <div class="ca">${esc(b.author||'')}</div>
     <div class="ct" style="font-size:${size}px">${esc(b.title)}</div>`;
@@ -187,16 +193,17 @@ function bookEl(b, L, scale=S()){
   el.style.cssText=`width:${w}px;height:${h}px;color:${L.fg}`;
   const fs = Math.max(8, Math.min(w*.5, 16));
   el.innerHTML = `
-    <div class="face spine" style="background:${L.bg};transform:translateZ(${d/2}px)">
+    ${b.spine ? `<div class="face spine" style="background:${L.bg} ${url(b.spine)} center/100% 100%;transform:translateZ(${d/2}px)"></div>` :
+    `<div class="face spine" style="background:${L.bg};transform:translateZ(${d/2}px)">
       <div class="mark" style="color:${L.ac}"></div>
       <div class="t" style="font-size:${fs}px">${w>14?esc(b.title):''}</div>
       <div class="a">${w>20?esc(b.author||''):''}</div>
-    </div>
+    </div>`}
     <div class="face" style="background:${L.bg};filter:brightness(.85);transform:rotateY(180deg) translateZ(${d/2}px)"></div>
     <div class="face cover" style="background:${L.bg};width:${d}px;left:${(w-d)/2}px;transform:rotateY(-90deg) translateZ(${w/2}px)">
       ${coverInner(b,L,Math.max(10,Math.min(22,d/7)))}</div>
     <div class="face cover" style="background:${L.bg};width:${d}px;left:${(w-d)/2}px;transform:rotateY(90deg) translateZ(${w/2}px)">
-      <div class="art" style="background:${artCSS(L)};transform:scaleX(-1);filter:brightness(.92)"></div></div>
+      <div class="art" style="background:${b.cover?L.bg:artCSS(L)};transform:scaleX(-1);filter:brightness(.92)"></div></div>
     <div class="top" style="width:${w}px;height:${d}px;top:${-d/2}px;transform:rotateX(90deg)"></div>`;
   el.dataset.i=b._i;
   return {el,w,h,d};
@@ -209,7 +216,7 @@ function preview(b){
   if(!b || pvCur===b._i) return; pvCur=b._i;
   const L=look(b);
   pvImg.style.background=L.bg; pvImg.style.color=L.fg;
-  pvImg.innerHTML=`<div class="cover">${coverInner(b,L,15)}</div>`;
+  pvImg.innerHTML=`<div class="cover">${coverInner(b,L,15,'contain')}</div>`;
   pvCap.innerHTML=`${esc(b.title)}<small>${esc(b.author||'')}</small>`;
 }
 const STATUS = {done:'已完成',reading:'閱讀中',want:'想讀',paused:'暫停'};
