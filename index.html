@@ -68,12 +68,10 @@ body{background:var(--bg);color:var(--ink);font-family:'Inter Tight','Noto Sans 
   background-image:repeating-linear-gradient(90deg,rgba(0,0,0,.07) 0 1px,transparent 1px 3px)}
 
 /* ── shelf view ── */
-#shelf .track{position:absolute;left:0;bottom:calc(46% - 150px*var(--s));display:flex;align-items:flex-end;
-  will-change:transform;perspective:1400px}
-#shelf .slot{flex:none;display:flex;justify-content:center;align-items:flex-end;padding:0 calc(2px*var(--s));
-  transition:width .7s cubic-bezier(.6,0,.2,1), transform .35s cubic-bezier(.3,1.4,.5,1)}
-#shelf .slot.sel .book, #shelf .slot.leaving .book{transition:transform .7s cubic-bezier(.6,0,.2,1)}
-#shelf .slot.hover:not(.sel){transform:translateY(-16px)}
+#shelf .track{position:absolute;left:0;right:0;bottom:calc(46% - 150px*var(--s));height:0;perspective:4200px}
+#shelf .slot.flat .cover, #shelf .slot.flat .top{visibility:hidden}
+#shelf .slot{position:absolute;left:0;bottom:0;transform-style:preserve-3d;will-change:transform}
+#shelf .book{transform-origin:50% 100%}
 
 /* ── ring view ── */
 #ring{perspective:1900px;perspective-origin:50% 25%}
@@ -240,44 +238,57 @@ detail.querySelector('.x').onclick=()=>{ hideDetail(); deselect(); };
 document.getElementById('count').textContent = `${books.length} Books`;
 document.getElementById('date').textContent = new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'});
 
-/* ───────────── shelf view ───────────── */
+/* ───────────── shelf view ─────────────
+   Books slide past a focus point in the middle of the shelf. As a book
+   approaches it, it turns on its vertical axis to face its cover outward,
+   and its neighbours are pushed aside by the extra width it takes up. */
 const track = document.querySelector('#shelf .track');
-let slots=[], setWidth=0;
+let slots=[], setWidth=0, x=0, tx=0, lastInput=0, focusIdx=-1, hoverSlot=null;
 function buildShelf(){
   track.innerHTML=''; slots=[];
-  const s=S(), items = books.map(b=>({b,L:look(b)}));
-  const one = items.reduce((t,it)=>t+it.L.w*s+4*s,0);
-  const copies = Math.max(3, Math.ceil(innerWidth*2/one)+2);
+  const s=S(), gap=4*s, items = books.map(b=>({b,L:look(b)}));
+  setWidth = items.reduce((t,it)=>t+it.L.w*s+gap,0);
+  const copies = Math.max(3, Math.ceil(innerWidth/setWidth)+3);
+  let pos=0;
   for(let c=0;c<copies;c++) items.forEach(({b,L})=>{
     const {el,w,d} = bookEl(b,L);
     const slot=document.createElement('div');
-    slot.className='slot';
-    const base = w+4*s;
-    slot.style.width=base+'px';
-    el.style.transform=`rotateZ(${L.lean}deg)`;
-    el.style.transformOrigin = L.lean<0?'0% 100%':'100% 100%';
+    slot.className='slot'; slot.style.width=w+'px';
     slot.appendChild(el); track.appendChild(slot);
-    slots.push({slot,el,b,base,open:d+28,lean:L.lean});
+    slots.push({slot,el,b,w,d,lean:L.lean,s0:pos+w/2,lift:0,e:0,dist:0});
+    pos+=w+gap;
   });
-  setWidth = one;
 }
-let x=0, tx=0, vel=0, selected=null;
-function deselect(){
-  if(!selected) return;
-  const s=selected; selected=null;
-  s.slot.classList.remove('sel'); s.slot.classList.add('leaving'); s.slot.style.width=s.base+'px';
-  setTimeout(()=>s.slot.classList.remove('leaving'),750);
-  s.el.style.transform=`rotateZ(${s.lean}deg)`;
+const focusX = () => (detail.classList.contains('open') && innerWidth>700) ? (innerWidth-400)/2 : innerWidth/2;
+function nearestSlot(){
+  let best=null; for(const s of slots) if(!best||Math.abs(s.dist)<Math.abs(best.dist)) best=s; return best;
 }
-function selectSlot(s){
-  if(selected===s){ deselect(); hideDetail(); return; }
-  deselect(); selected=s;
-  s.slot.classList.add('sel'); s.slot.style.width=s.open+'px';
-  s.el.style.transform=`translateY(-10px) rotateY(90deg)`;
-  const r=s.slot.getBoundingClientRect();
-  const centre = innerWidth>700 ? (innerWidth-400)/2 : innerWidth/2;
-  tx += centre-(r.left+s.open/2);
-  showDetail(s.b);
+function centreOn(s){ tx -= s.dist; lastInput=0; }
+function deselect(){}
+function layoutShelf(){
+  const sc=S(), R=46*sc, F=focusX();
+  // keep the virtual strip covering the screen (infinite loop)
+  while(tx>-setWidth){ tx-=setWidth; x-=setWidth; }
+  while(tx<-setWidth*2){ tx+=setWidth; x+=setWidth; }
+  let E=0;
+  for(const s of slots){
+    s.dist = s.s0 + x - F;
+    const g = Math.abs(s.dist)<R ? .5+.5*Math.cos(Math.PI*s.dist/R) : 0, f = g*g*(3-2*g)*g;  // eased: only the centre book opens fully
+    s.f=f; s.a=f*Math.PI/2;
+    s.e = (s.w*Math.cos(s.a)+s.d*Math.sin(s.a)) - s.w + 26*sc*f;   // extra width while turned
+    E+=s.e;
+  }
+  let P=0;
+  for(const s of slots){
+    const off = P/2 - (E-P-s.e)/2;            // pushed by the turned books on each side
+    P+=s.e;
+    s.lift += ((s===hoverSlot && s.f<.5 ? 1:0) - s.lift)*.2;
+    const cx = s.s0 + x + off;
+    s.slot.style.transform=`translate3d(${cx-s.w/2}px,${-14*sc*s.lift - 8*sc*s.f}px,0)`;
+    s.el.style.transform=`rotateZ(${s.lean*(1-s.f)}deg) rotateY(${s.a*180/Math.PI}deg)`;
+    const flat = s.f<.002; if(flat!==s.flat){ s.flat=flat; s.slot.classList.toggle('flat',flat); }
+  }
+  track.style.perspectiveOrigin=`${F}px -140px`;
 }
 
 /* ───────────── ring view ───────────── */
@@ -326,8 +337,8 @@ stage.addEventListener('pointerdown',e=>{
 stage.addEventListener('pointermove',e=>{
   if(down){
     const dx=e.clientX-down.x; down.x=e.clientX; moved+=Math.abs(dx);
-    if(moved>6){ stage.classList.add('dragging'); if(mode==='shelf'&&selected){deselect();hideDetail();} }
-    if(mode==='shelf') tx+=dx*1.2; else trot+=dx*.25;
+    if(moved>6) stage.classList.add('dragging');
+    if(mode==='shelf'){ tx+=dx*1.2; lastInput=performance.now(); } else trot+=dx*.25;
     return;
   }
   hoverAt(e.clientX,e.clientY);
@@ -339,31 +350,33 @@ function hoverAt(cx,cy){
   const hit=bookAt(cx,cy);
   if(mode==='ring'){ liftRing(hit?ringItems.find(r=>r.el===hit):null); }
   else {
-    for(const s of slots) if(s.slot.classList.contains('hover') && s.el!==hit) s.slot.classList.remove('hover');
-    const s=hit&&slots.find(s=>s.el===hit);
-    if(s){ s.slot.classList.add('hover'); preview(s.b); }
+    hoverSlot = hit ? slots.find(s=>s.el===hit) : null;
+    if(hoverSlot) preview(hoverSlot.b);
   }
 }
-stage.addEventListener('pointerleave',()=>{ lastPtr=null; liftRing(null); slots.forEach(s=>s.slot.classList.remove('hover')); });
+stage.addEventListener('pointerleave',()=>{ lastPtr=null; liftRing(null); hoverSlot=null; });
 stage.addEventListener('pointerup',e=>{
   stage.classList.remove('dragging');
   const wasClick = moved<6; down=null;
   if(!wasClick) return;
   const hit=bookAt(e.clientX,e.clientY);
-  if(!hit){ deselect(); hideDetail(); return; }
-  if(mode==='shelf'){ const s=slots.find(s=>s.el===hit); if(s) selectSlot(s); }
+  if(!hit){ hideDetail(); return; }
+  if(mode==='shelf'){ const s=slots.find(s=>s.el===hit); if(s){ centreOn(s); showDetail(s.b); } }
   else { const it=ringItems.find(r=>r.el===hit); if(it){ liftRing(it); showDetail(it.b); } }
 });
 addEventListener('wheel',e=>{
   if(detail.contains(e.target)) return;
   const d = Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
-  if(mode==='shelf'){ if(selected&&Math.abs(d)>4){deselect();hideDetail();} tx-=d; }
+  if(mode==='shelf'){ tx-=d; lastInput=performance.now(); }
   else trot-=d*.08;
 },{passive:true});
 addEventListener('keydown',e=>{
   if(e.key==='Escape'){deselect();hideDetail();}
-  if(e.key==='ArrowRight'){ mode==='shelf'?tx-=160:trot-=10; }
-  if(e.key==='ArrowLeft'){ mode==='shelf'?tx+=160:trot+=10; }
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+    const dir = e.key==='ArrowRight'?1:-1;
+    if(mode==='shelf'){ const i=slots.indexOf(nearestSlot()), n=slots[i+dir]; if(n) tx-=n.s0-slots[i].s0; lastInput=0; }
+    else trot-=10*dir;
+  }
 });
 
 document.querySelectorAll('.pills button').forEach(btn=>btn.onclick=()=>{
@@ -381,15 +394,18 @@ let last=performance.now(), frame=0;
 function tick(now){
   const dt=Math.min(50,now-last); last=now; frame++;
   if(mode==='shelf'){
-    if(!selected){
-      while(tx>-setWidth){ tx-=setWidth; x-=setWidth; }
-      while(tx<-setWidth*2){ tx+=setWidth; x+=setWidth; }
+    x += (tx-x)*.12;
+    layoutShelf();
+    // once scrolling stops, settle the nearest book squarely at the focus point
+    if(!down && now-lastInput>160){
+      const n=nearestSlot();
+      if(Math.abs(n.dist)>.5) tx -= n.dist*.25;
+      if(n.b._i!==focusIdx && Math.abs(n.dist)<20){
+        focusIdx=n.b._i;
+        if(!hoverSlot) preview(n.b);
+        if(detail.classList.contains('open')) showDetail(n.b);
+      }
     }
-    const nx = x+(tx-x)*.1; vel = nx-x; x=nx;
-    track.style.transform=`translate3d(${x}px,0,0)`;
-    const sway=Math.max(-14,Math.min(14,vel*.6));
-    track.style.perspectiveOrigin=`${-x+innerWidth/2}px 40%`;
-    for(const s of slots) if(s!==selected && !s.slot.classList.contains('leaving')) s.el.style.transform=`rotateZ(${s.lean}deg) rotateY(${-sway}deg)`;
   } else {
     const paused = down || detail.classList.contains('open') || lifted;
     if(!paused) trot -= dt*.005;
@@ -400,7 +416,7 @@ function tick(now){
   if(lastPtr && !down && frame%6===0) hoverAt(lastPtr.cx,lastPtr.cy);
   requestAnimationFrame(tick);
 }
-function build(){ buildShelf(); buildRing(); tx=x=-setWidth; }
+function build(){ buildShelf(); buildRing(); x=tx=-setWidth - (slots[books.length]?.s0??0) + setWidth + innerWidth/2; }
 build();
 preview(books[0]);
 let rz; addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{deselect();hideDetail();build();},200)});
